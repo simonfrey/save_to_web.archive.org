@@ -2,7 +2,7 @@ package main
 
 import (
 	"flag"
-	"github.com/L1am0/proxyfy"
+	"github.com/simonfrey/proxyfy"
 	"github.com/PuerkitoBio/goquery"
 	"log"
 	"net/url"
