@@ -6,7 +6,7 @@
 Scrapes the given website for internal links and saves the found ones into [web.archive.org](https://web.archive.org/)
 
 # Installation
-**I asume you have already installed go. ([Go installation manual](https://golang.org/doc/install))**
+**I assume you have already installed go. ([Go installation manual](https://golang.org/doc/install))**
 
 ## Dependencies
 
