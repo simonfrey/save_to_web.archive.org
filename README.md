@@ -6,7 +6,7 @@
 Scrapes the given website for internal links and saves the found ones into [web.archive.org](https://web.archive.org/)
 
 # Installation
-**I asume you have go already installed. ([Go installation manual](https://golang.org/doc/install)**
+**I asume you have go already installed. ([Go installation manual](https://golang.org/doc/install))**
 
 ## Dependencies
 Download the dependecies via `go get`
@@ -25,4 +25,4 @@ Just clone this git repo
 
 Navigate into the directory of the git repo.
 
-Execute with `go run main.go`.
+Execute with `go run main.go http[s]://[yourwebsite.com]`. With `http[s]://[yourwebsite.com]` being the website you want to scrape and save.
