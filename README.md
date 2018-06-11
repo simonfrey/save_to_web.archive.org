@@ -1,14 +1,19 @@
+![Save to web.archive.org logo](https://github.com/simonfrey/save_to_web.archive.org/raw/master/logo.png "Save to web.archive.org logo")
+
+---
+
 # Description
-Scrapes the given website for internal links and saves the found ones into (web.archive.org)[https://web.archive.org/]
+Scrapes the given website for internal links and saves the found ones into [web.archive.org](https://web.archive.org/)
 
 # Installation
-**I asume you have go already installed. ((Go installation manual)[https://golang.org/doc/install])**
+**I asume you have go already installed. ([Go installation manual](https://golang.org/doc/install)**
 
 ## Dependencies
 Download the dependecies via `go get`
 
 Execute the both following commands:
 `go get -u github.com/L1am0/proxyfy`
+
 `go get -u github.com/PuerkitoBio/goquery`
 
 ## Download tool
