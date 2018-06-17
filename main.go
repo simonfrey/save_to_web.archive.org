@@ -51,8 +51,8 @@ func (c *SafeMap) Get() map[string]int {
 
 func main() {
 	//Setup expected flags
-	useProxyPtr := flag.Bool("p", true, "Proxyfy the requests")
-	internalUrlsPtr := flag.Bool("i", true, "Also use interal urls e.g. /hello/world")
+	useProxyPtr := flag.Bool("p", false, "Proxyfy the requests")
+	internalUrlsPtr := flag.Bool("i", false, "Also use interal urls e.g. /hello/world")
 
 	//Parse commandline args
 	flag.Parse()
@@ -76,11 +76,14 @@ func main() {
 	}
 	dUrl := pU.Scheme + "://" + pU.Host
 
-	log.Println("Save URL: ", cUrl)
+
+
 
 	useProxy = *useProxyPtr
 	internalUrls = *internalUrlsPtr
 
+
+	log.Printf("\n Save URL: %s\n Use Proxy: %t\n Crawl internal urls: %t\n", cUrl,useProxy,internalUrls)
 	gimmeConfig := proxyfy.GimmeProxyConfig{
 		Protocol:       "http",
 		Get:            true,
