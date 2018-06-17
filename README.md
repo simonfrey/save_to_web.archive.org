@@ -40,3 +40,15 @@ Execute with:
 ```
 go run main.go http[s]://[yourwebsite.com]
 ```
+
+**Additional commandline arguments:**
+
+`-p` for proxyfing the requests
+
+`-i` for also crawling internal urls (e.g. /test/foo)
+
+So if you want to use the tool with also crawling interal links and use a proxy for that it would be the following command
+
+```
+go run main.go http[s]://[yourwebsite.com] -p -i
+```

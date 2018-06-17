@@ -8,20 +8,27 @@ import (
 	"net/url"
 	"strings"
 	"sync"
+	"net/http"
 )
 
 type SafeMap struct {
 	v       map[string]int
 	baseUrl string
+	domainUrl string
 	queue   chan string
 	mux     sync.Mutex
 }
 
 var wgQuery sync.WaitGroup
+var internalUrls,useProxy bool
 
 func (c *SafeMap) Add(url string, urlType int) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
+
+	if internalUrls && strings.HasPrefix(url,"/"){
+		url = c.domainUrl + url
+	}
 
 	if strings.Index(url, c.baseUrl) == 0 && c.v[url] == 0 {
 		c.v[url] = urlType
@@ -43,6 +50,10 @@ func (c *SafeMap) Get() map[string]int {
 }
 
 func main() {
+	//Setup expected flags
+	useProxyPtr := flag.Bool("p", true, "Proxyfy the requests")
+	internalUrlsPtr := flag.Bool("i", true, "Also use interal urls e.g. /hello/world")
+
 	//Parse commandline args
 	flag.Parse()
 	args := flag.Args()
@@ -57,7 +68,18 @@ func main() {
 	}
 	cUrl := urlStruct.String()
 
+	pU, err := url.Parse(cUrl)
+	if err != nil {
+		log.Fatal(err)
+
+
+	}
+	dUrl := pU.Scheme + "://" + pU.Host
+
 	log.Println("Save URL: ", cUrl)
+
+	useProxy = *useProxyPtr
+	internalUrls = *internalUrlsPtr
 
 	gimmeConfig := proxyfy.GimmeProxyConfig{
 		Protocol:       "http",
@@ -74,6 +96,7 @@ func main() {
 	uMap := SafeMap{
 		v:       make(map[string]int),
 		baseUrl: cUrl,
+		domainUrl:dUrl,
 		queue:   queue,
 	}
 
@@ -105,8 +128,14 @@ func main() {
 }
 
 func analyzeUrl(sUrl string, uMap SafeMap, proxyfy *proxyfy.Proxyfy) {
+	var err error
+	var res *http.Response
 
-	res, err := proxyfy.Get(sUrl)
+	if useProxy {
+		res, err = proxyfy.Get(sUrl)
+	}else{
+		res, err = http.Get(sUrl)
+	}
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -142,13 +171,21 @@ func addUrl(sUrl string, proxyfy *proxyfy.Proxyfy) {
 	baseUrl := "https://web.archive.org/save/"
 	for i := 0; i < 50; i++ {
 		log.Println("[", i, "] Try for ", sUrl)
-		resp, err := proxyfy.Get(baseUrl + sUrl)
+		var err error
+		var res *http.Response
+
+		if useProxy {
+			res, err = proxyfy.Get(baseUrl + sUrl)
+		}else{
+			res, err = http.Get(baseUrl + sUrl)
+		}
+
 		if err != nil {
-			log.Println(err)
+				log.Println(err)
 			continue
 		}
 
-		if resp.StatusCode == 200 {
+		if res.StatusCode == 200 {
 			break
 		}
 	}
