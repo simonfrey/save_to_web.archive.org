@@ -2,6 +2,10 @@
 
 ---
 
+Please consider supporting my work via Liberapay [![Donate Button](https://liberapay.com/assets/widgets/donate.svg)](https://liberapay.com/l1am0)
+
+---
+
 # Description
 Scrapes the given website for internal links and saves the found ones into [web.archive.org](https://web.archive.org/)
 
