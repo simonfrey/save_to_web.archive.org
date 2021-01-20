@@ -2,9 +2,9 @@
 
 ---
 
-Help me to grow this project:
+**Like my work?**
 
-[![Donate Button](https://liberapay.com/assets/widgets/donate.svg)](https://liberapay.com/l1am0)
+[Tip me](https://simon-frey.com/tip)
 
 ---
 
