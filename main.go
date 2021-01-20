@@ -2,31 +2,34 @@ package main
 
 import (
 	"flag"
-	"github.com/simonfrey/proxyfy"
+	"fmt"
 	"github.com/PuerkitoBio/goquery"
+	"github.com/simonfrey/proxyfy"
 	"log"
+	"math/rand"
+	"net/http"
 	"net/url"
 	"strings"
 	"sync"
-	"net/http"
+	"time"
 )
 
 type SafeMap struct {
-	v       map[string]int
-	baseUrl string
+	v         map[string]int
+	baseUrl   string
 	domainUrl string
-	queue   chan string
-	mux     sync.Mutex
+	queue     chan string
+	mux       sync.Mutex
 }
 
 var wgQuery sync.WaitGroup
-var internalUrls,useProxy bool
+var internalUrls, useProxy bool
 
 func (c *SafeMap) Add(url string, urlType int) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
 
-	if internalUrls && strings.HasPrefix(url,"/"){
+	if internalUrls && strings.HasPrefix(url, "/") {
 		url = c.domainUrl + url
 	}
 
@@ -53,6 +56,7 @@ func main() {
 	//Setup expected flags
 	useProxyPtr := flag.Bool("p", false, "Proxyfy the requests")
 	internalUrlsPtr := flag.Bool("i", false, "Also use interal urls e.g. /hello/world")
+	sleepBetweenRequests := flag.Bool("s", true, "Sleep between add request to not be flagged internet archive")
 
 	//Parse commandline args
 	flag.Parse()
@@ -72,35 +76,30 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 
-
 	}
 	dUrl := pU.Scheme + "://" + pU.Host
-
-
-
 
 	useProxy = *useProxyPtr
 	internalUrls = *internalUrlsPtr
 
-
-	log.Printf("\n Save URL: %s\n Use Proxy: %t\n Crawl internal urls: %t\n", cUrl,useProxy,internalUrls)
+	log.Printf("\n Save URL: %s\n Use Proxy: %t\n Crawl internal urls: %t\n", cUrl, useProxy, internalUrls)
 	gimmeConfig := proxyfy.GimmeProxyConfig{
-		Protocol:       "http",
-		Get:            true,
-		Post:           true,
-		SupportsHTTPS:  true,
-		MinSpeed:       500,
+		Protocol:      "http",
+		Get:           true,
+		Post:          true,
+		SupportsHTTPS: true,
+		MinSpeed:      500,
 	}
 	proxyfy := proxyfy.NewProxyfyAdvancedConfig(gimmeConfig)
 
 	//Setup Chanel
 	queue := make(chan string)
 
-	uMap := SafeMap{
-		v:       make(map[string]int),
-		baseUrl: cUrl,
-		domainUrl:dUrl,
-		queue:   queue,
+	uMap := &SafeMap{
+		v:         make(map[string]int),
+		baseUrl:   cUrl,
+		domainUrl: dUrl,
+		queue:     queue,
 	}
 
 	//Add first baseurl to queue
@@ -117,26 +116,32 @@ func main() {
 		analyzeUrl(sUrl, uMap, proxyfy)
 	}
 
-	log.Printf("Found %d subelements on %s",len(uMap.Get()),cUrl)
+	log.Printf("Found %d subelements on %s", len(uMap.Get()), cUrl)
 
 	//Internet archive only allows single connection. So we have to do the request slowly
 	for sUrl, urlType := range uMap.Get() {
 		if urlType == 2 || urlType == 1 {
-			addUrl(sUrl,proxyfy)
+			addUrl(sUrl, proxyfy, *sleepBetweenRequests)
+
+			if *sleepBetweenRequests {
+				sleepTime := time.Duration(rand.Intn(10) + 5)
+				fmt.Printf("Sleep for %d seconds\n", sleepTime)
+				time.Sleep(sleepTime)
+			}
 		}
 	}
-
 
 	log.Println("Done")
 }
 
-func analyzeUrl(sUrl string, uMap SafeMap, proxyfy *proxyfy.Proxyfy) {
+func analyzeUrl(sUrl string, uMap *SafeMap, proxyfy *proxyfy.Proxyfy) {
+
 	var err error
 	var res *http.Response
 
 	if useProxy {
 		res, err = proxyfy.Get(sUrl)
-	}else{
+	} else {
 		res, err = http.Get(sUrl)
 	}
 	if err != nil {
@@ -144,7 +149,7 @@ func analyzeUrl(sUrl string, uMap SafeMap, proxyfy *proxyfy.Proxyfy) {
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		log.Println("status code error: %d %s", res.StatusCode, res.Status)
+		log.Printf("status code error: %d %s\n", res.StatusCode, res.Status)
 		return
 	}
 	doc, err := goquery.NewDocumentFromReader(res.Body)
@@ -170,7 +175,7 @@ func analyzeUrl(sUrl string, uMap SafeMap, proxyfy *proxyfy.Proxyfy) {
 	wgQuery.Done()
 }
 
-func addUrl(sUrl string, proxyfy *proxyfy.Proxyfy) {
+func addUrl(sUrl string, proxyfy *proxyfy.Proxyfy, sleepBetweenRequests bool) {
 	baseUrl := "https://web.archive.org/save/"
 	for i := 0; i < 50; i++ {
 		log.Println("[", i, "] Try for ", sUrl)
@@ -179,20 +184,25 @@ func addUrl(sUrl string, proxyfy *proxyfy.Proxyfy) {
 
 		if useProxy {
 			res, err = proxyfy.Get(baseUrl + sUrl)
-		}else{
+		} else {
 			res, err = http.Get(baseUrl + sUrl)
 		}
 
 		if err != nil {
-				log.Println(err)
+			log.Println(err)
 			continue
 		}
 
 		if res.StatusCode == 200 {
 			break
 		}
+
+		if sleepBetweenRequests {
+			sleepTime := time.Duration(rand.Intn(5) + 5)
+			fmt.Printf("Sleep for %d seconds\n", sleepTime)
+			time.Sleep(sleepTime)
+		}
 	}
 	log.Println("Added: ", sUrl)
-
 
 }
