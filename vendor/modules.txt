@@ -1,0 +1,14 @@
+# github.com/PuerkitoBio/goquery v1.6.1
+## explicit
+github.com/PuerkitoBio/goquery
+# github.com/andybalholm/cascadia v1.1.0
+github.com/andybalholm/cascadia
+# github.com/google/go-querystring v1.0.0
+## explicit
+github.com/google/go-querystring/query
+# github.com/simonfrey/proxyfy v0.0.0-20180713134927-05df283adc3b
+## explicit
+github.com/simonfrey/proxyfy
+# golang.org/x/net v0.0.0-20200202094626-16171245cfb2
+golang.org/x/net/html
+golang.org/x/net/html/atom
