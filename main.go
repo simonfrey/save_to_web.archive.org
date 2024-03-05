@@ -14,8 +14,13 @@ import (
 	"time"
 )
 
+type Url struct {
+	url string
+	typ int
+}
 type SafeMap struct {
-	v         map[string]int
+	v         []Url
+	seenUrls  map[string]int
 	baseUrl   string
 	domainUrl string
 	queue     chan string
@@ -33,9 +38,11 @@ func (c *SafeMap) Add(url string, urlType int) {
 		url = c.domainUrl + url
 	}
 
-	if strings.Index(url, c.baseUrl) == 0 && c.v[url] == 0 {
-		c.v[url] = urlType
-		log.Println(len(c.v), ":", url)
+	if strings.Index(url, c.baseUrl) == 0 && c.seenUrls[url] == 0 {
+		c.v = append(c.v, Url{url, urlType})
+		c.seenUrls[url] = 1
+
+		//	log.Println(len(c.v), ":", url)
 
 		if urlType == 1 {
 			wgQuery.Add(1)
@@ -46,10 +53,25 @@ func (c *SafeMap) Add(url string, urlType int) {
 	}
 }
 
-func (c *SafeMap) Get() map[string]int {
+func (c *SafeMap) GetSingleElement() (*Url, int) {
 	c.mux.Lock()
 	defer c.mux.Unlock()
-	return c.v
+
+	if len(c.v) == 0 {
+		return nil, 0
+	}
+
+	// Randomize slice sorting
+	rand.Shuffle(len(c.v), func(i, j int) {
+		c.v[i], c.v[j] = c.v[j], c.v[i]
+	})
+
+	// pop first element from slice c.v
+	u := c.v[0]
+	if len(c.v) > 0 {
+		c.v = c.v[1:]
+	}
+	return &u, len(c.v)
 }
 
 func main() {
@@ -82,7 +104,7 @@ func main() {
 	useProxy = *useProxyPtr
 	internalUrls = *internalUrlsPtr
 
-	log.Printf("\n Save URL: %s\n Use Proxy: %t\n Crawl internal urls: %t\n", cUrl, useProxy, internalUrls)
+	log.Printf("\n Save URL: %s\n Use Proxy: %t\n Crawl internal urls: %t\n\n\n", cUrl, useProxy, internalUrls)
 	gimmeConfig := proxyfy.GimmeProxyConfig{
 		Protocol:      "http",
 		Get:           true,
@@ -96,7 +118,8 @@ func main() {
 	queue := make(chan string)
 
 	uMap := &SafeMap{
-		v:         make(map[string]int),
+		v:         make([]Url, 0),
+		seenUrls:  make(map[string]int),
 		baseUrl:   cUrl,
 		domainUrl: dUrl,
 		queue:     queue,
@@ -106,31 +129,37 @@ func main() {
 	uMap.Add(cUrl, 1)
 
 	//Close queue after all urls have been processed
+	processing := true
 	go func() {
 		wgQuery.Wait()
 		close(queue)
+		processing = false
 	}()
 
 	//Endless loop to range over channel
-	for sUrl := range queue {
-		analyzeUrl(sUrl, uMap, proxyfy)
-	}
-
-	log.Printf("Found %d subelements on %s", len(uMap.Get()), cUrl)
+	go func() {
+		for sUrl := range queue {
+			if *sleepBetweenRequests {
+				sleepTime := time.Duration(rand.Intn(10))
+				time.Sleep(sleepTime)
+			}
+			analyzeUrl(sUrl, uMap, proxyfy)
+		}
+	}()
 
 	//Internet archive only allows single connection. So we have to do the request slowly
-	for sUrl, urlType := range uMap.Get() {
-		if urlType == 2 || urlType == 1 {
-			addUrl(sUrl, proxyfy, *sleepBetweenRequests)
-
-			if *sleepBetweenRequests {
-				sleepTime := time.Duration(rand.Intn(10) + 5)
-				fmt.Printf("Sleep for %d seconds\n", sleepTime)
-				time.Sleep(sleepTime)
+	for processing {
+		for {
+			u, remainingElements := uMap.GetSingleElement()
+			if u == nil {
+				break
+			}
+			if u.typ == 2 || u.typ == 1 {
+				fmt.Println("Remaining Elements: ", remainingElements)
+				addUrl(u.url, proxyfy, *sleepBetweenRequests)
 			}
 		}
 	}
-
 	log.Println("Done")
 }
 
@@ -145,16 +174,17 @@ func analyzeUrl(sUrl string, uMap *SafeMap, proxyfy *proxyfy.Proxyfy) {
 		res, err = http.Get(sUrl)
 	}
 	if err != nil {
-		log.Fatal(err)
+		//log.Fatal(err)
+		return
 	}
 	defer res.Body.Close()
 	if res.StatusCode != 200 {
-		log.Printf("status code error: %d %s\n", res.StatusCode, res.Status)
+		//log.Printf("status code error: %d %s\n", res.StatusCode, res.Status)
 		return
 	}
 	doc, err := goquery.NewDocumentFromReader(res.Body)
 	if err != nil {
-		log.Println(err)
+		//log.Println(err)
 		return
 	}
 
@@ -178,6 +208,10 @@ func analyzeUrl(sUrl string, uMap *SafeMap, proxyfy *proxyfy.Proxyfy) {
 func addUrl(sUrl string, proxyfy *proxyfy.Proxyfy, sleepBetweenRequests bool) {
 	baseUrl := "https://web.archive.org/save/"
 	for i := 0; i < 50; i++ {
+		if sleepBetweenRequests {
+			sleepTime := time.Duration(rand.Intn(5) + 5)
+			time.Sleep(sleepTime)
+		}
 		log.Println("[", i, "] Try for ", sUrl)
 		var err error
 		var res *http.Response
@@ -197,12 +231,7 @@ func addUrl(sUrl string, proxyfy *proxyfy.Proxyfy, sleepBetweenRequests bool) {
 			break
 		}
 
-		if sleepBetweenRequests {
-			sleepTime := time.Duration(rand.Intn(5) + 5)
-			fmt.Printf("Sleep for %d seconds\n", sleepTime)
-			time.Sleep(sleepTime)
-		}
 	}
-	log.Println("Added: ", sUrl)
+	log.Printf("Added: %s \n\n", sUrl)
 
 }
